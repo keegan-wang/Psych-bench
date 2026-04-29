@@ -66,3 +66,18 @@ def test_corpus_get_question_by_id():
 def test_valid_fixture_loads_without_error():
     corpus = load_corpus(FIXTURE)
     assert corpus is not None
+
+
+def test_full_phase2_corpus_loads_and_validates():
+    root = Path(__file__).resolve().parents[1]
+    corpus = load_corpus(
+        root / "psychbench" / "experiments" / "asch_documents" /
+        "corpus" / "phase2_fictional.yaml"
+    )
+    assert len(corpus.questions) == 12
+    for q in corpus.questions:
+        for dt in ("wikipedia", "forum", "news"):
+            for strength in ("declarative", "hedged", "incidental"):
+                assert q.templates[dt][strength].strip(), (
+                    f"empty template {q.id} {dt}/{strength}"
+                )
