@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import re
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from psychbench.framework.agent import BaseAgent
 from psychbench.framework.backends import ModelBackend
 from psychbench.framework.types import AgentResponse, TrialContext
+
+
+if TYPE_CHECKING:  # pragma: no cover
+    from psychbench.interpretability.collector import ActivationCollector
 
 
 PromptBuilder = Callable[[TrialContext], str]
@@ -36,6 +40,7 @@ class ModelAgent(BaseAgent):
         backend: ModelBackend,
         stateful: bool,
         prompt_builder: PromptBuilder,
+        activation_collector: "ActivationCollector | None" = None,
     ) -> None:
         super().__init__(
             agent_id=agent_id,
@@ -49,17 +54,32 @@ class ModelAgent(BaseAgent):
         self.backend = backend
         self.stateful = stateful
         self.prompt_builder = prompt_builder
+        self.activation_collector = activation_collector
 
     def respond(self, context: TrialContext) -> AgentResponse:
         prompt = self.prompt_builder(context)
-        raw = self.backend.generate(prompt, stateful=self.stateful)
+        if self.activation_collector is not None:
+            raw, record = self.activation_collector.collect(
+                self.backend.hooked_model, prompt, token_labels=None,
+            )
+            metadata = {
+                "model": self.backend.model,
+                "stateful": self.stateful,
+                "interpretability_record": record,
+            }
+        else:
+            raw = self.backend.generate(prompt, stateful=self.stateful)
+            metadata = {
+                "model": self.backend.model,
+                "stateful": self.stateful,
+            }
         parsed = parse_letter_answer(raw)
         return AgentResponse(
             agent_id=self.agent_id,
             raw_text=raw,
             parsed_answer=parsed,
             prompt=prompt,
-            metadata={"model": self.backend.model, "stateful": self.stateful},
+            metadata=metadata,
         )
 
     def reset(self) -> None:
