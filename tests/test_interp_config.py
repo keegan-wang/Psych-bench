@@ -14,13 +14,13 @@ def _base(**over):
             "naive": {
                 "type": "model",
                 "backend": "transformer_lens",
-                "model": "hf-internal-testing/tiny-random-gpt2",
+                "model": "roneneldan/TinyStories-1M",
             },
         },
         "interpretability": {
             "enabled": True,
             "backend": "transformer_lens",
-            "model": "hf-internal-testing/tiny-random-gpt2",
+            "model": "roneneldan/TinyStories-1M",
             "device": "cpu",
             "layers": "all",
             "max_new_tokens": 64,
@@ -44,15 +44,15 @@ def test_returns_none_when_enabled_false():
 def test_returns_populated_config_with_defaults_filled():
     cfg = {
         "agents": {"naive": {"backend": "transformer_lens",
-                              "model": "hf-internal-testing/tiny-random-gpt2"}},
+                              "model": "roneneldan/TinyStories-1M"}},
         "interpretability": {
             "enabled": True,
-            "model": "hf-internal-testing/tiny-random-gpt2",
+            "model": "roneneldan/TinyStories-1M",
         },
     }
     out = resolve_interpretability(cfg)
     assert isinstance(out, InterpretabilityConfig)
-    assert out.model == "hf-internal-testing/tiny-random-gpt2"
+    assert out.model == "roneneldan/TinyStories-1M"
     assert out.device is None
     assert out.layers == "all"
     assert out.max_new_tokens == 64
