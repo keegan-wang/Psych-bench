@@ -1,0 +1,38 @@
+experiment:
+  name: asch_phase1
+  type: asch
+  trials: 18
+  critical_trials: 12
+  critical_trial_indices: [2, 3, 5, 6, 8, 9, 11, 12, 13, 15, 16, 17]
+  seed: 42
+
+agents:
+  confederates:
+    type: scripted
+    count: 5
+    behavior: always_wrong_on_critical
+    wrong_answer: B
+    dissenter: false
+  naive:
+    type: model
+    backend: openai            # openai | anthropic | huggingface | echo
+    model: gpt-4o-mini
+    stateful: false
+    position: last
+
+environment:
+  response_visibility: public
+  answer_order: sequential
+
+control:
+  run_control: true
+  response_visibility: private
+
+scoring:
+  method: binary
+  conformity_threshold: 1
+
+logging:
+  save_context_windows: true
+  output_dir: results/
+  format: jsonl
