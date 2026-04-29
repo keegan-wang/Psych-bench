@@ -10,7 +10,7 @@ from .agent import BaseAgent
 from .environment import Environment
 from .logging_utils import JsonlLogger, write_summary
 from .trial import run_trial
-from .types import Stimulus, TrialResult
+from .types import AgentResponse, Stimulus, TrialResult
 
 
 class Session:
@@ -67,14 +67,50 @@ class Session:
     def _serialize_trial(
         self, result: TrialResult, extra: dict[str, Any]
     ) -> dict[str, Any]:
-        return {
+        responses_payload: list[dict[str, Any]] = []
+        interp_block: dict[str, Any] | None = None
+        for r in result.responses:
+            metadata = dict(r.metadata) if r.metadata else {}
+            record = metadata.pop("interpretability_record", None)
+            stripped = AgentResponse(
+                agent_id=r.agent_id,
+                raw_text=r.raw_text,
+                parsed_answer=r.parsed_answer,
+                prompt=r.prompt,
+                metadata=metadata,
+            )
+            responses_payload.append(asdict(stripped))
+            if record is not None and interp_block is None:
+                rel_path = (
+                    f"activations/{self.session_label}/"
+                    f"trial_{result.trial_index:03d}.npz"
+                )
+                try:
+                    from psychbench.interpretability.storage import (
+                        save_activation_record,
+                    )
+                    save_activation_record(
+                        record, self.log_path.parent / rel_path,
+                    )
+                    interp_block = {
+                        "activations_path": rel_path,
+                        "layers": list(record.layers),
+                        "n_prompt_tokens": int(record.n_prompt_tokens),
+                        "token_positions": dict(record.token_positions),
+                    }
+                except OSError:
+                    interp_block = None
+        payload: dict[str, Any] = {
             "trial_index": result.trial_index,
             "is_critical": result.is_critical,
             "stimulus": asdict(result.stimulus),
             "correct_answer": result.correct_answer,
-            "responses": [asdict(r) for r in result.responses],
+            "responses": responses_payload,
             "scoring": extra,
             "environment": self.environment.snapshot(),
             "session_label": self.session_label,
             "timestamp": time.time(),
         }
+        if interp_block is not None:
+            payload["interpretability"] = interp_block
+        return payload
