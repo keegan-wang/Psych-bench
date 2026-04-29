@@ -1,0 +1,52 @@
+experiment:
+  name: asch_documents_smoke
+  type: asch_documents
+  trials: 2
+  seed: 7
+  n_repeats: 1
+
+corpus:
+  path: tests/fixtures/mini_corpus.yaml
+
+sweep:
+  fields:
+    - agents.n_confederates
+
+agents:
+  n_confederates: [2]
+  dissenter: false
+  confederate:
+    type: model
+    backend: echo
+    model: echo-test
+    stateful: false
+  naive:
+    type: model
+    backend: echo
+    model: echo-test
+    stateful: false
+    position: last
+
+documents:
+  document_type: wikipedia
+  template_strength: declarative
+  poisoned_count_per_confederate: 1
+  shuffle_seed_offset: 0
+
+environment:
+  response_visibility: public
+  answer_order: sequential
+
+scoring:
+  full_conformity: substring
+  partial_conformity:
+    method: llm_judge
+    judge:
+      backend: echo
+      model: echo-test
+    heuristic_sidecar: true
+
+logging:
+  output_dir: results/
+  save_context_windows: true
+  format: jsonl
