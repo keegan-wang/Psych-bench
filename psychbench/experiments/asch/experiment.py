@@ -58,10 +58,31 @@ class AschExperiment(BaseExperiment):
                 wrong_answer=wrong,
             ))
 
-        naive_backend = get_backend(
-            naive_cfg.get("backend", "echo"),
-            naive_cfg.get("model", "echo-test"),
+        from psychbench.interpretability.config import (
+            resolve_interpretability,
         )
+        interp_cfg = resolve_interpretability(self.config)
+        if interp_cfg is not None and not for_control:
+            from psychbench.interpretability.backend import (
+                TransformerLensBackend,
+            )
+            from psychbench.interpretability.collector import (
+                ActivationCollector,
+            )
+            naive_backend = TransformerLensBackend(
+                model=interp_cfg.model, device=interp_cfg.device,
+            )
+            collector = ActivationCollector(
+                layers=interp_cfg.layers,
+                max_new_tokens=interp_cfg.max_new_tokens,
+            )
+        else:
+            naive_backend = get_backend(
+                naive_cfg.get("backend", "echo"),
+                naive_cfg.get("model", "echo-test"),
+            )
+            collector = None
+
         position_cfg = naive_cfg.get("position", "last")
         naive_position = (
             n_conf if position_cfg == "last" else int(position_cfg)
@@ -72,6 +93,7 @@ class AschExperiment(BaseExperiment):
             backend=naive_backend,
             stateful=bool(naive_cfg.get("stateful", False)),
             prompt_builder=build_asch_prompt,
+            activation_collector=collector,
         )
 
         return [*confederates, naive]
