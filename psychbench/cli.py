@@ -38,6 +38,10 @@ def _cost_gate_total(cfg: dict) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    if getattr(args, "verbose", False):
+        from psychbench.framework.progress import stderr_printer, subscribe
+        subscribe(stderr_printer)
+
     cfg = load_config(args.config)
     exp_type = cfg["experiment"]["type"]
 
@@ -107,6 +111,10 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument(
         "--i-know", action="store_true",
         help="Bypass cost gate for large sweeps",
+    )
+    pr.add_argument(
+        "--verbose", "-v", action="store_true",
+        help="Stream live trial/agent events to stderr as the run proceeds",
     )
     pr.set_defaults(func=_cmd_run)
 

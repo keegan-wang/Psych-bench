@@ -9,6 +9,7 @@ from typing import Any, Callable
 from .agent import BaseAgent
 from .environment import Environment
 from .logging_utils import JsonlLogger, write_summary
+from .progress import emit
 from .trial import run_trial
 from .types import AgentResponse, Stimulus, TrialResult
 
@@ -39,10 +40,21 @@ class Session:
     def run(self) -> list[TrialResult]:
         for agent in self.agents:
             agent.reset()
+        emit(
+            "session_start",
+            {
+                "session_label": self.session_label,
+                "n_trials": len(self.stimuli),
+            },
+        )
+        t0 = time.time()
         results: list[TrialResult] = []
         with JsonlLogger(self.log_path) as log:
             for stim in self.stimuli:
-                result = run_trial(stim, self.agents, self.environment)
+                result = run_trial(
+                    stim, self.agents, self.environment,
+                    session_label=self.session_label,
+                )
                 if self.score_trial is not None:
                     scores = self.score_trial(result)
                     for k, v in scores.items():
@@ -51,6 +63,14 @@ class Session:
                     result_extra = scores
                 else:
                     result_extra = {}
+                emit(
+                    "trial_end",
+                    {
+                        "trial_index": result.trial_index,
+                        "scoring": result_extra,
+                        "session_label": self.session_label,
+                    },
+                )
                 log.write(self._serialize_trial(result, result_extra))
                 results.append(result)
         summary: dict[str, Any] = {
@@ -62,6 +82,14 @@ class Session:
         if self.summarize is not None:
             summary.update(self.summarize(results))
         write_summary(self.summary_path, summary)
+        emit(
+            "session_end",
+            {
+                "session_label": self.session_label,
+                "n_trials": len(results),
+                "elapsed_s": time.time() - t0,
+            },
+        )
         return results
 
     def _serialize_trial(
