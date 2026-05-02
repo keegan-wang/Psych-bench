@@ -1,0 +1,53 @@
+experiment:
+  name: asch_documents_colab_smoke
+  type: asch_documents
+  trials: 12
+  critical_trials: 12
+  seed: 42
+  n_repeats: 1
+
+corpus:
+  path: psychbench/experiments/asch_documents/corpus/phase2_fictional.yaml
+
+sweep:
+  fields:
+    - agents.n_confederates
+
+agents:
+  n_confederates: [3]
+  dissenter: false
+  confederate:
+    type: model
+    backend: echo
+    model: echo-test
+    stateful: false
+  naive:
+    type: model
+    backend: echo
+    model: echo-test
+    stateful: false
+    position: last
+
+documents:
+  document_type: wikipedia
+  template_strength: declarative
+  poisoned_count_per_confederate: 3
+  shuffle_seed_offset: 0
+
+environment:
+  response_visibility: public
+  answer_order: sequential
+
+scoring:
+  full_conformity: substring
+  partial_conformity:
+    method: llm_judge
+    judge:
+      backend: echo
+      model: echo-test
+    heuristic_sidecar: true
+
+logging:
+  output_dir: results/
+  save_context_windows: true
+  format: jsonl

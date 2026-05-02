@@ -1,0 +1,4 @@
+cell_id,n_confederates,rate,rate_type
+n_confederates=3,3,0.0,conformity_rate_unconditional
+n_confederates=3,3,0.0,conformity_rate_unanimous_only
+n_confederates=3,3,1.0,confederate_reliability
