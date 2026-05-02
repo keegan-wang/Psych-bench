@@ -35,6 +35,20 @@ def _load_jsonl(path: str | Path) -> list[dict[str, Any]]:
     ]
 
 
+def _find_aggregate(summary_path: str | Path) -> Path | None:
+    """Locate an aggregate.json alongside a repeat-0 summary, if any.
+
+    Given `results/asch_experimental_<ts>_r0.summary.json` return
+    `results/asch_experimental_<ts>.aggregate.json` when it exists.
+    """
+    p = Path(summary_path)
+    if "_r" not in p.name:
+        return None
+    base = p.name.rsplit("_r", 1)[0]
+    agg = p.with_name(f"{base}.aggregate.json")
+    return agg if agg.is_file() else None
+
+
 def plot_phase1(
     exp_summary: str | Path,
     ctrl_summary: str | Path,
@@ -44,44 +58,95 @@ def plot_phase1(
 ) -> plt.Figure:
     """Two-panel Phase-1 figure: headline conformity bar + per-critical-trial strip.
 
-    Left panel shows experimental vs control conformity rate — the canonical
-    Asch comparison. Right panel shows, for each critical trial, whether the
-    naive agent answered correctly (green), conformed with the wrong majority
-    (red X), or picked some *other* wrong answer (grey square).
+    Left panel: experimental vs control conformity rate (the canonical Asch
+    comparison). When an `.aggregate.json` exists next to the summary files
+    (i.e. the run used `n_repeats > 1`), each bar shows the mean across
+    repeats with SEM error bars and a strip of individual-repeat dots.
+
+    Right panel: per-critical-trial behaviour for the *first* repeat — green
+    circle = correct, red X = conformed, grey square = other wrong answer.
     """
     exp = _load_summary(exp_summary)
     ctrl = _load_summary(ctrl_summary)
     exp_log_p = exp_log or str(exp_summary).replace(".summary.json", ".jsonl")
+
+    exp_agg_path = _find_aggregate(exp_summary)
+    ctrl_agg_path = _find_aggregate(ctrl_summary)
+    exp_agg = _load_summary(exp_agg_path) if exp_agg_path else None
+    ctrl_agg = _load_summary(ctrl_agg_path) if ctrl_agg_path else None
 
     fig, axes = plt.subplots(
         1, 2, figsize=(13, 4.5), gridspec_kw={"width_ratios": [1, 2.2]}
     )
 
     ax = axes[0]
-    rates = [exp["conformity_rate"], ctrl["conformity_rate"]]
-    counts = [
-        (exp["n_conformed"], exp["n_critical"]),
-        (ctrl["n_conformed"], ctrl["n_critical"]),
-    ]
-    bars = ax.bar(
-        ["Experimental\n(public)", "Control\n(private)"],
-        rates,
-        color=[COLOR_EXP, COLOR_CTRL],
-        edgecolor="black",
-    )
-    for bar, rate, (nc, nt) in zip(bars, rates, counts):
-        ax.annotate(
-            f"{rate:.1%}\n({nc}/{nt})",
-            xy=(bar.get_x() + bar.get_width() / 2, rate),
-            xytext=(0, 4),
-            textcoords="offset points",
-            ha="center",
-            fontsize=10,
+    if exp_agg is not None and ctrl_agg is not None:
+        exp_rate = exp_agg["mean_conformity_rate"]
+        ctrl_rate = ctrl_agg["mean_conformity_rate"]
+        exp_err = exp_agg["sem_conformity_rate"]
+        ctrl_err = ctrl_agg["sem_conformity_rate"]
+        bars = ax.bar(
+            ["Experimental\n(public)", "Control\n(private)"],
+            [exp_rate, ctrl_rate],
+            yerr=[exp_err, ctrl_err],
+            capsize=8,
+            color=[COLOR_EXP, COLOR_CTRL],
+            edgecolor="black",
         )
-    ax.set_ylim(0, max(1.0, max(rates) * 1.3 + 0.1))
+        for i, agg in enumerate((exp_agg, ctrl_agg)):
+            per = agg.get("per_repeat_rate", [])
+            if per:
+                xs = np.full(len(per), i) + np.random.default_rng(0).uniform(
+                    -0.1, 0.1, size=len(per),
+                )
+                ax.scatter(
+                    xs, per, color="black", alpha=0.6, s=22, zorder=3,
+                )
+        for bar, rate, agg in zip(
+            bars, [exp_rate, ctrl_rate], (exp_agg, ctrl_agg)
+        ):
+            ax.annotate(
+                f"{rate:.1%} ± {agg['sem_conformity_rate']:.1%}\n"
+                f"(n={agg['n_repeats']})",
+                xy=(bar.get_x() + bar.get_width() / 2, rate),
+                xytext=(0, 10),
+                textcoords="offset points",
+                ha="center",
+                fontsize=9,
+            )
+        ax.set_ylim(
+            0, max(1.0, (exp_rate + exp_err) * 1.4, (ctrl_rate + ctrl_err) * 1.4)
+        )
+        delta = exp_rate - ctrl_rate
+        ax.set_title(
+            f"Phase 1 conformity (n={exp_agg['n_repeats']} repeats)  "
+            f"|  Δ = {delta:+.1%}"
+        )
+    else:
+        rates = [exp["conformity_rate"], ctrl["conformity_rate"]]
+        counts = [
+            (exp["n_conformed"], exp["n_critical"]),
+            (ctrl["n_conformed"], ctrl["n_critical"]),
+        ]
+        bars = ax.bar(
+            ["Experimental\n(public)", "Control\n(private)"],
+            rates,
+            color=[COLOR_EXP, COLOR_CTRL],
+            edgecolor="black",
+        )
+        for bar, rate, (nc, nt) in zip(bars, rates, counts):
+            ax.annotate(
+                f"{rate:.1%}\n({nc}/{nt})",
+                xy=(bar.get_x() + bar.get_width() / 2, rate),
+                xytext=(0, 4),
+                textcoords="offset points",
+                ha="center",
+                fontsize=10,
+            )
+        ax.set_ylim(0, max(1.0, max(rates) * 1.3 + 0.1))
+        delta = exp["conformity_rate"] - ctrl["conformity_rate"]
+        ax.set_title(f"Phase 1 conformity  |  Δ = {delta:+.1%}")
     ax.set_ylabel("Conformity rate on critical trials")
-    delta = exp["conformity_rate"] - ctrl["conformity_rate"]
-    ax.set_title(f"Phase 1 conformity  |  Δ = {delta:+.1%}")
     ax.grid(axis="y", alpha=0.3)
 
     ax = axes[1]

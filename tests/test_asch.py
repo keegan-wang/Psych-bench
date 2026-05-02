@@ -272,6 +272,57 @@ def test_asch_experiment_full_run_writes_jsonl_and_summary(tmp_path: Path):
     assert exp_sum["n_critical"] == 12
 
 
+def test_asch_experiment_n_repeats_produces_aggregate(tmp_path: Path):
+    """With n_repeats > 1, the run should produce per-repeat files, an
+    aggregate.json per condition, and a comparison block with std stats."""
+    cfg = _base_config()
+    cfg["experiment"]["n_repeats"] = 3
+    cfg["control"]["run_control"] = True
+    exp = AschExperiment(cfg)
+    summary = exp.run(output_dir=tmp_path)
+
+    for cond in ("experimental", "control"):
+        assert summary[cond]["n_repeats"] == 3
+        assert len(summary[cond]["repeats"]) == 3
+        seeds = [r["seed"] for r in summary[cond]["repeats"]]
+        assert seeds == sorted(set(seeds)), "repeats must use distinct seeds"
+        agg_path = Path(summary[cond]["aggregate_path"])
+        assert agg_path.exists()
+        agg = _json.loads(agg_path.read_text())
+        assert agg["n_repeats"] == 3
+        assert len(agg["per_repeat_rate"]) == 3
+        assert agg["pooled_n_critical"] == 12 * 3
+        # Per-repeat jsonl files must all exist and be separate
+        for r_idx, rep in enumerate(summary[cond]["repeats"]):
+            p = Path(rep["log_path"])
+            assert p.exists()
+            assert f"_r{r_idx}" in p.name
+            lines = p.read_text().strip().splitlines()
+            assert len(lines) == 18
+
+    cmp_block = summary["comparison"]
+    assert cmp_block["n_repeats"] == 3
+    assert "experimental_std" in cmp_block
+    assert "control_std" in cmp_block
+
+
+def test_asch_experiment_n_repeats_one_preserves_legacy_naming(tmp_path: Path):
+    """n_repeats == 1 (or unset) must keep the original single-file layout:
+    no _r0 suffix, no aggregate.json — purely backwards compatible."""
+    cfg = _base_config()
+    cfg["experiment"]["n_repeats"] = 1
+    cfg["control"]["run_control"] = True
+    exp = AschExperiment(cfg)
+    summary = exp.run(output_dir=tmp_path)
+    for cond in ("experimental", "control"):
+        assert summary[cond]["n_repeats"] == 1
+        assert "aggregate_path" not in summary[cond]
+        log_path = Path(summary[cond]["log_path"])
+        assert "_r" not in log_path.name
+    agg_files = list(tmp_path.glob("*.aggregate.json"))
+    assert agg_files == []
+
+
 # ---------- analysis + config ---------- #
 
 def test_load_session_summary_and_compare(tmp_path: Path):
