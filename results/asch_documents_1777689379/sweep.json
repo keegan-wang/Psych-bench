@@ -1,6 +1,6 @@
 {
-  "run_dir": "results/asch_documents_1777685706",
-  "timestamp": 1777685706,
+  "run_dir": "results/asch_documents_1777689379",
+  "timestamp": 1777689379,
   "config": {
     "experiment": {
       "name": "asch_documents_colab_smoke",
@@ -75,8 +75,8 @@
         "agents.n_confederates": 3
       },
       "status": "ok",
-      "log_path": "results/asch_documents_1777685706/cells/n_confederates=3.jsonl",
-      "summary_path": "results/asch_documents_1777685706/cells/n_confederates=3.summary.json",
+      "log_path": "results/asch_documents_1777689379/cells/n_confederates=3.jsonl",
+      "summary_path": "results/asch_documents_1777689379/cells/n_confederates=3.summary.json",
       "headline": {
         "conformity_rate_unconditional": 0.0,
         "conformity_rate_unanimous_only": 0.0,
