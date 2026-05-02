@@ -46,10 +46,21 @@ class ScriptedAgent(BaseAgent):
         if self.behavior == "always_wrong_on_critical":
             if not context.stimulus.is_critical:
                 return context.stimulus.correct_label
-            if self.wrong_answer is not None:
+            correct = context.stimulus.correct_label
+            # Prefer the configured wrong answer when it's actually wrong,
+            # but fall back to the first other option (deterministic across
+            # confederates) on trials where the configured letter happens to
+            # be correct. Without this, confederates silently "agree" with the
+            # ground truth on a fraction of critical trials and the naive is
+            # never under Asch pressure there.
+            if (
+                self.wrong_answer is not None
+                and self.wrong_answer != correct
+                and self.wrong_answer in context.stimulus.options
+            ):
                 return self.wrong_answer
             for label in sorted(context.stimulus.options):
-                if label != context.stimulus.correct_label:
+                if label != correct:
                     return label
             raise RuntimeError("No wrong options available")
         if self.behavior == "custom_fn":

@@ -45,6 +45,26 @@ def test_scripted_all_confederates_unanimous_on_critical():
     assert a2.respond(ctx).parsed_answer == "B"
 
 
+def test_scripted_wrong_answer_falls_back_when_it_equals_correct():
+    """If the configured wrong_answer coincides with the trial's correct
+    answer, all confederates must still unanimously give a genuinely wrong
+    answer — otherwise there is no Asch pressure on that critical trial."""
+    a1 = ScriptedAgent(
+        agent_id="c1", position=0, behavior="always_wrong_on_critical",
+        wrong_answer="B",
+    )
+    a2 = ScriptedAgent(
+        agent_id="c2", position=1, behavior="always_wrong_on_critical",
+        wrong_answer="B",
+    )
+    ctx = _ctx(True, correct="B")
+    r1 = a1.respond(ctx).parsed_answer
+    r2 = a2.respond(ctx).parsed_answer
+    assert r1 != "B", "Confederate is wrongly agreeing with the correct answer"
+    assert r1 == r2, "Confederates disagreed; no unanimous majority"
+    assert r1 in {"A", "C"}
+
+
 def test_scripted_custom_fn():
     def pick(ctx):
         return "C"
